@@ -1,3 +1,4 @@
+```dockerfile
 FROM php:8.2-cli
 
 # Install system dependencies
@@ -28,11 +29,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy project
+# Copy project files
 COPY . /var/www
 
 # Install Laravel dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-interaction
 
 # Set permissions
 RUN chmod -R 775 storage bootstrap/cache
@@ -40,5 +44,6 @@ RUN chmod -R 775 storage bootstrap/cache
 # Expose port
 EXPOSE 8000
 
-# Run migrations then start Laravel
-CMD ["sh", "-c", "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+# Run database migration, seeder, then start Laravel
+CMD ["sh", "-c", "php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+```
