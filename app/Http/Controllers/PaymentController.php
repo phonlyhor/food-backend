@@ -115,9 +115,55 @@ class PaymentController extends Controller
         if ($request->payment_method === 'bakong') {
             $bakongAccountId = config('services.bakong.account_id', 'liihorr_food@bakong');
             $tranId = 'BAKONG-' . $order->id . '-' . time();
-            $amount = $order->total_amount;
+            $amount = (float) $order->total_amount;
 
-            // Use custom offline generator to avoid SDK bugs
+            try {
+                $individualInfo = new IndividualInfo(
+                    bakongAccountID:     $bakongAccountId,
+                    merchantName:        'LIHOR Phon',
+                    merchantCity:        'Phnom Penh',
+                    currency:            KHQRData::CURRENCY_USD,
+                    amount:              $amount,
+                    billNumber:          $tranId,
+                    storeLabel:          'STORE',
+                    terminalLabel:       'T1',
+                    expirationTimestamp: strval(
+                        (int) floor(microtime(true) * 1000) + (10 * 60 * 1000)
+                    )
+                );
+
+                $khqrResponse = BakongKHQR::generateIndividual($individualInfo);
+
+                if (isset($khqrResponse->status['code']) && $khqrResponse->status['code'] === 0) {
+                    $qrString = data_get($khqrResponse->data, 'qr');
+                    if ($qrString) {
+                        $md5 = md5($qrString);
+                        $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qrString);
+                        $qrSvg = (string) QrCode::format('svg')->size(300)->generate($qrString);
+
+                        $payment->update([
+                            'transaction_id' => $tranId,
+                            'md5' => $md5
+                        ]);
+
+                        return response()->json([
+                            'success' => true,
+                            'payment_method' => 'bakong',
+                            'transaction_id' => $tranId,
+                            'khqr_string' => $qrString,
+                            'qr_image_url' => $qrImageUrl,
+                            'qr_code_svg' => $qrSvg,
+                            'amount' => $amount,
+                            'md5' => $md5,
+                            'message' => 'Please scan this KHQR code using your Bakong app.'
+                        ]);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error('Bakong SDK generation failed: ' . $e->getMessage());
+            }
+
+            // Fallback generation if SDK/API fails
             $qrString = $this->generateKHQRString($bakongAccountId, 'LIHOR Phon', $amount, $tranId);
 
             $md5 = md5($qrString);

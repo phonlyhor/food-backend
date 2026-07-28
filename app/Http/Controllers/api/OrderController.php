@@ -9,6 +9,8 @@ use App\Models\OrderItem;
 use App\Models\Coupons;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class OrderController extends Controller
@@ -196,6 +198,12 @@ class OrderController extends Controller
             }
 
             DB::commit();
+            
+            // ── Bắn Telegram Notification នៅទីនេះពេលទិញធម្មតា (COD) ──────────────────────
+            $paymentMethodStr = strtolower(trim($request->payment_method));
+            if (in_array($paymentMethodStr, ['cod', 'cash on delivery', 'cash_on_delivery'])) {
+                $this->sendTelegramNotification($order, $totalAmount);
+            }
 
             return response()->json([
                 'success' => true,
@@ -210,6 +218,63 @@ class OrderController extends Controller
                 'message' => 'Failed to place order. Please try again.',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Telegram Notification សម្រាប់បញ្ជូនសារនៅពេលមានអ្នកទិញធម្មតា (Place Order)
+     */
+    private function sendTelegramNotification(Order $order, float $amount): void
+    {
+        $token  = config('services.telegram.bot_token') ?? env('TELEGRAM_BOT_TOKEN');
+        $chatId = config('services.telegram.chat_id') ?? env('TELEGRAM_CHAT_ID');
+
+        if (!$token || !$chatId) return;
+
+        $order->loadMissing(['user', 'items.product', 'items.variant']);
+        $user = $order->user;
+
+        $itemLines = '';
+        if ($order->items) {
+            foreach ($order->items as $i => $item) {
+                $productName = $item->product->name  ?? 'N/A';
+                $sizeName    = $item->variant->size  ?? 'N/A';
+                $qty         = $item->qty;
+                $price       = number_format($item->price, 2);
+                $itemLines  .= "  " . ($i + 1) . ". {$productName} ({$sizeName}) x{$qty} = \${$price}\n";
+            }
+        } else {
+            $itemLines = "  គ្មានទិន្នន័យទំនិញ (No items found)\n";
+        }
+        
+        $paymentMethod = strtoupper($order->payment_method ?? 'N/A');
+        $isCOD = in_array($paymentMethod, ['COD', 'CASH ON DELIVERY', 'CASH_ON_DELIVERY']);
+        $statusText = $isCOD ? 'បង់ប្រាក់ពេលទទួលទំនិញ (COD) 🚚' : 'រង់ចាំការបង់ប្រាក់ (Pending) ⏳';
+
+        $message = "🛒 *មានការបញ្ជាទិញថ្មី (New Order Placed)!*\n"
+            . "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            . "👤 *ព័ត៌មានអតិថិជន (Customer Info)*\n"
+            . "• ឈ្មោះ:  `" . ($user->name ?? 'N/A') . "`\n"
+            . "• លេខទូរស័ព្ទ: `" . ($user->phone ?? 'N/A') . "`\n\n"
+            . "📦 *ព័ត៌មានការបញ្ជាទិញ (Order Info)*\n"
+            . "• លេខកូដវិក្កយបត្រ:  `#{$order->id}`\n"
+            . "• ការបង់ប្រាក់:  `{$paymentMethod}`\n"
+            . "• ស្ថានភាព:    `{$statusText}`\n"
+            . "• សរុបទឹកប្រាក់:     `\$" . number_format($amount, 2) . "`\n\n"
+            . "🛍️ *បញ្ជីទំនិញ (Items)*\n"
+            . $itemLines
+            . "\n🕐 `" . now()->format('Y-m-d H:i:s') . "`";
+
+        try {
+            Http::withoutVerifying()
+                ->timeout(5)
+                ->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                    'chat_id'    => $chatId,
+                    'text'       => $message,
+                    'parse_mode' => 'Markdown',
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('បរាជ័យក្នុងការផ្ញើសារ Telegram (Order): ' . $e->getMessage());
         }
     }
 
