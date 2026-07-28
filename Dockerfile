@@ -34,8 +34,11 @@ COPY . /var/www
 # Install Laravel dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Expose port
-EXPOSE 8000
+# Laravel storage permissions
+RUN chmod -R 775 storage bootstrap/cache
+
+# Render will provide PORT automatically
+EXPOSE 10000
 
 # Start Laravel
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
