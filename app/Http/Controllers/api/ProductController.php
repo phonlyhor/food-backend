@@ -50,12 +50,13 @@ class ProductController extends Controller
             $product = Product::create([
                 'category_id' => $request->category_id,
                 'name'        => $request->name,
-                'description' => $request->description,
-                'image'       => $imagePath,
+                'description' => $request->description ?? '',
+                'image'       => $imagePath ?? '',
                 'status'      => $request->status,
             ]);
 
             foreach ($request->input('variants') as $variant) {
+                $variant['status'] = 'active';
                 $product->productVariants()->create($variant);
             }
 
@@ -133,7 +134,11 @@ return response()->json([
                 $product->image = $request->file('image')->store('product_images', 'public');
             }
 
-            $product->fill($request->only(['category_id', 'name', 'description', 'status']));
+            $fillData = $request->only(['category_id', 'name', 'description', 'status']);
+            if (array_key_exists('description', $fillData)) {
+                $fillData['description'] = $fillData['description'] ?? '';
+            }
+            $product->fill($fillData);
             $product->save();
 
             // Handle Variants
@@ -159,6 +164,7 @@ return response()->json([
                             'size'  => $variantData['size'],
                             'price' => $variantData['price'],
                             'stock' => $variantData['stock'],
+                            'status' => 'active',
                         ]);
                         $incomingIds[] = $newVariant->id;
                     }

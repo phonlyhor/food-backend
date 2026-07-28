@@ -67,7 +67,6 @@ class OrderController extends Controller
             'items.*.qty' => 'required|integer|min:1',
             'items.*.price' => 'required|numeric|min:0',
         ]);
-
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -159,6 +158,17 @@ class OrderController extends Controller
                     'price' => $item['price'],
                     'qty' => $item['qty'],
                 ]);
+
+                if (isset($item['variant_id']) && $item['variant_id']) {
+                    $variant = \App\Models\Product_Varaints::find($item['variant_id']);
+                    if ($variant) {
+                        if ((int)$variant->stock < $item['qty']) {
+                            throw new \Exception("Not enough stock for this product variant.");
+                        }
+                        $variant->stock = (string)((int)$variant->stock - $item['qty']);
+                        $variant->save();
+                    }
+                }
             }
 
             // Increment coupon usage count if used
@@ -257,9 +267,23 @@ class OrderController extends Controller
             ], 404);
         }
 
+        $originalStatus = $order->status;
+
         $order->update([
             'status' => $request->status
         ]);
+
+        if ($originalStatus !== 'cancelled' && $request->status === 'cancelled') {
+            $order->load('items');
+            foreach ($order->items as $item) {
+                if ($item->variant_id) {
+                    $variant = \App\Models\Product_Varaints::find($item->variant_id);
+                    if ($variant) {
+                        $variant->increment('stock', $item->qty);
+                    }
+                }
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -376,16 +400,16 @@ class OrderController extends Controller
             ->take(5)
             ->get();
 
-        // Get monthly sales for the past 6 months
+        // Get monthly sales for the past 6 months (PostgreSQL syntax)
         $monthlySales = Order::select(
-                DB::raw('MONTHNAME(created_at) as month'),
+                DB::raw("TO_CHAR(created_at, 'FMMonth') as month"),
                 DB::raw('SUM(total_amount) as revenue'),
                 DB::raw('COUNT(*) as count')
             )
             ->where('status', 'completed')
             ->where('created_at', '>=', Carbon::now()->subMonths(6))
-            ->groupBy(DB::raw('YEAR(created_at), MONTH(created_at), MONTHNAME(created_at)'))
-            ->orderBy(DB::raw('YEAR(created_at), MONTH(created_at)'))
+            ->groupBy(DB::raw("EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at), TO_CHAR(created_at, 'FMMonth')"))
+            ->orderBy(DB::raw("EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at)"))
             ->get();
 
         return response()->json([

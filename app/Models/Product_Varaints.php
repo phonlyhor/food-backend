@@ -14,7 +14,7 @@ class Product_Varaints extends Model
         'size',
         'price',
         'stock',
-        
+        'status',
     ];
     public function product()
     {

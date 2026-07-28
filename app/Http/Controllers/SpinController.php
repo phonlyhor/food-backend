@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\SpinPrice;
 use App\Models\SpinHistory;
 use App\Models\SpinQuotas;
-use App\Models\Coupon;
+use App\Models\Coupons;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -72,7 +72,7 @@ class SpinController extends Controller
 
             // Auto-create/activate the coupon code in the coupons table if won
             if ($wonPrize && $wonPrize->prize_type === 'coupon' && $wonPrize->prize_value) {
-                $exists = \App\Models\Coupon::where('code', $wonPrize->prize_value)->exists();
+                $exists = \App\Models\Coupons::where('code', $wonPrize->prize_value)->exists();
                 if (!$exists) {
                     $isPercentage = strpos($wonPrize->name, '%') !== false;
                     $discountValue = (float) filter_var($wonPrize->prize_value, FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION);
@@ -80,7 +80,7 @@ class SpinController extends Controller
                         $discountValue = 5.00;
                     }
 
-                    \App\Models\Coupon::create([
+                    \App\Models\Coupons::create([
                         'name' => $wonPrize->name,
                         'code' => $wonPrize->prize_value,
                         'type' => $isPercentage ? 'percentage' : 'fixed',

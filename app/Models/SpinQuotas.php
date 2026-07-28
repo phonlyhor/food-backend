@@ -9,6 +9,8 @@ class SpinQuotas extends Model
 {
     use HasFactory;
     protected $table = 'user_spin_quotas';
+    protected $primaryKey = null;
+    public $incrementing = false;
     protected $fillable = [
         'user_id',
         'spin_count',
