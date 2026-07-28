@@ -42,12 +42,12 @@ class PaymentController extends Controller
         
         // Tag 29: Merchant Account Info (Bakong template)
         $tag29Value = '';
-        $tag29Value .= $this->makeTag(0, 'hps.bakong');
-        $tag29Value .= $this->makeTag(1, $accountId);
+        $tag29Value .= $this->makeTag(0, 'bakong.nbc.gov.kh'); // GUID
+        $tag29Value .= $this->makeTag(1, $accountId); // Bakong Account ID
         
         $parts = explode('@', $accountId);
         if (count($parts) > 1) {
-            $tag29Value .= $this->makeTag(2, $parts[1]); // Subtag 02
+            $tag29Value .= $this->makeTag(2, $parts[1]); // Subtag 02 (Acquiring Bank)
         }
         
         $payload .= $this->makeTag(29, $tag29Value);
@@ -59,8 +59,10 @@ class PaymentController extends Controller
         $payload .= $this->makeTag(60, 'Phnom Penh'); // City
         
         // Tag 62: Additional Data (Bill ID)
-        $tag62Value = $this->makeTag(1, $tranId);
-        $payload .= $this->makeTag(62, $tag62Value);
+        if ($tranId) {
+            $tag62Value = $this->makeTag(1, $tranId);
+            $payload .= $this->makeTag(62, $tag62Value);
+        }
         
         // Tag 63: CRC16 Checksum
         $payload .= '6304';
@@ -115,51 +117,9 @@ class PaymentController extends Controller
             $tranId = 'BAKONG-' . $order->id . '-' . time();
             $amount = $order->total_amount;
 
-            try {
-                $individualInfo = new IndividualInfo(
-                    bakongAccountID:     $bakongAccountId,
-                    merchantName:        'LIHOR Phon',
-                    merchantCity:        'Phnom Penh',
-                    currency:            KHQRData::CURRENCY_USD,
-                    amount:              $amount,
-                    expirationTimestamp: strval(
-                        (int) floor(microtime(true) * 1000) + (10 * 60 * 1000)
-                    )
-                );
-
-                $khqrResponse = BakongKHQR::generateIndividual($individualInfo);
-
-                if (isset($khqrResponse->status['code']) && $khqrResponse->status['code'] === 0) {
-                    $qrString = data_get($khqrResponse->data, 'qr');
-                    if ($qrString) {
-                        $md5 = md5($qrString);
-                        $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qrString);
-                        $qrSvg = (string) QrCode::format('svg')->size(300)->generate($qrString);
-
-                        $payment->update([
-                            'transaction_id' => $tranId,
-                            'md5' => $md5
-                        ]);
-
-                        return response()->json([
-                            'success' => true,
-                            'payment_method' => 'bakong',
-                            'transaction_id' => $tranId,
-                            'khqr_string' => $qrString,
-                            'qr_image_url' => $qrImageUrl,
-                            'qr_code_svg' => $qrSvg,
-                            'amount' => $amount,
-                            'md5' => $md5,
-                            'message' => 'Please scan this KHQR code using your Bakong app.'
-                        ]);
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::error('Bakong SDK generation failed: ' . $e->getMessage());
-            }
-
-            // Fallback generation if SDK/API fails
+            // Use custom offline generator to avoid SDK bugs
             $qrString = $this->generateKHQRString($bakongAccountId, 'LIHOR Phon', $amount, $tranId);
+
             $md5 = md5($qrString);
             $qrImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qrString);
             $qrSvg = (string) QrCode::format('svg')->size(300)->generate($qrString);
