@@ -1,4 +1,4 @@
-```dockerfile
+
 FROM php:8.2-cli
 
 # Install system dependencies
@@ -46,4 +46,4 @@ EXPOSE 8000
 
 # Run database migration, seeder, then start Laravel
 CMD ["sh", "-c", "php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
-```
+
