@@ -39,7 +39,7 @@ class EventController extends Controller
 
         // Upload Image
         if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('events', 'public');
+            $validated['image'] = $request->file('image')->storeOnCloudinary('events')->getSecurePath();
         }
 
         // Create Event
@@ -111,7 +111,7 @@ class EventController extends Controller
 
         // Upload Image
         if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('events', 'public');
+            $validated['image'] = $request->file('image')->storeOnCloudinary('events')->getSecurePath();
         }
 
         // Update Event

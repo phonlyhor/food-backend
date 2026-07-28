@@ -34,14 +34,8 @@ class UserController extends Controller
 
         // Process profile picture file upload if exists
         if ($request->hasFile('profile_picture')) {
-            // Delete old profile picture if exists
-            if ($user->profile_picture) {
-                Storage::disk('public')->delete($user->profile_picture);
-            }
-
-            $profilePicturePath = $request->file('profile_picture')
-                ->store('profile_pictures', 'public');
-            $user->profile_picture = $profilePicturePath;
+            $user->profile_picture = $request->file('profile_picture')
+                ->storeOnCloudinary('profile_pictures')->getSecurePath();
         }
 
         $user->name = $validatedData['name'];

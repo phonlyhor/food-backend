@@ -44,7 +44,7 @@ class ProductController extends Controller
 
         try {
             $imagePath = $request->hasFile('image') 
-                ? $request->file('image')->store('product_images', 'public') 
+                ? $request->file('image')->storeOnCloudinary('product_images')->getSecurePath() 
                 : null;
 
             $product = Product::create([
@@ -128,10 +128,7 @@ return response()->json([
         try {
             // Handle Image
             if ($request->hasFile('image')) {
-                if ($product->image && Storage::disk('public')->exists($product->image)) {
-                    Storage::disk('public')->delete($product->image);
-                }
-                $product->image = $request->file('image')->store('product_images', 'public');
+                $product->image = $request->file('image')->storeOnCloudinary('product_images')->getSecurePath();
             }
 
             $fillData = $request->only(['category_id', 'name', 'description', 'status']);
@@ -215,9 +212,7 @@ return response()->json([
         try {
             $product->productVariants()->delete();
 
-            if ($product->image && Storage::disk('public')->exists($product->image)) {
-                Storage::disk('public')->delete($product->image);
-            }
+
 
             $product->delete();
 

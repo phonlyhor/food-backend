@@ -59,8 +59,7 @@ class AuthController extends Controller
     $profilePicturePath = null;
 
     if ($request->hasFile('profile_picture')) {
-        $profilePicturePath = $request->file('profile_picture')
-            ->store('profile_pictures', 'public');
+        $profilePicturePath = $request->file('profile_picture')->storeOnCloudinary('profile_pictures')->getSecurePath();
     }
 
     $user = User::create([

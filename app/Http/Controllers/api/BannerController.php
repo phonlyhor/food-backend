@@ -30,7 +30,7 @@ class BannerController extends Controller
             'link' => 'nullable|string|max:255',
             'status' => 'required|in:active,inactive',
         ]);
-        $imagePath = $request->file('image')->store('banner_images', 'public');
+        $imagePath = $request->file('image')->storeOnCloudinary('banner_images')->getSecurePath();
         $banner = Banner::create([
             'title' => $request->title,
             'image' => $imagePath,
@@ -68,7 +68,7 @@ class BannerController extends Controller
         ]);
         $imagePath = $banner->image;
         if($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('banner_images', 'public');
+            $imagePath = $request->file('image')->storeOnCloudinary('banner_images')->getSecurePath();
         }
         $banner->update([
             'title' => $request->title ?? $banner->title,

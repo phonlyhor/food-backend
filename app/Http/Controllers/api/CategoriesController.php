@@ -33,7 +33,7 @@ class CategoriesController extends Controller
         ]);
         $imagePath = null;
         if($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('categories', 'public');
+            $imagePath = $request->file('image')->storeOnCloudinary('categories')->getSecurePath();
         }
         $category = Category::create([
             'name' => $request->name,
@@ -87,7 +87,7 @@ class CategoriesController extends Controller
         ]);
         $imagePath = $category->image;
         if($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('categories', 'public');
+            $imagePath = $request->file('image')->storeOnCloudinary('categories')->getSecurePath();
         }
         $category->update([
             'name' => $request->name,
