@@ -1,6 +1,6 @@
-FROM php:8.2-fpm
+FROM php:8.2-cli
 
-# ដំឡើង System dependencies និង PHP extensions ចាំបាច់សម្រាប់ PostgreSQL
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -9,18 +9,33 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libpq-dev \
     zip \
-    unzip
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-install pdo pdo_pgsql mbstring exif pcntl bcmath gd
+# Install PHP extensions
+RUN docker-php-ext-install \
+    pdo \
+    pdo_pgsql \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    gd
 
-# ដំឡើង Composer (PHP Package Manager)
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# កំណត់ Working Directory
+# Set working directory
 WORKDIR /var/www
 
-# ចម្លងកូដទាំងអស់ចូល
+# Copy project
 COPY . /var/www
 
-EXPOSE 9000
-CMD ["php-fpm"]
+# Install Laravel dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Expose port
+EXPOSE 8000
+
+# Start Laravel
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
